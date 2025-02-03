@@ -1,10 +1,12 @@
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from .models import Base
 
-SQLALCHEMY_DATABASE_URL = "postgresql://user:password@db/red_social"
+DATABASE_URL = "postgresql://user:password@db/jurispjud"  # Cambia esto por tu URL de conexión
 
-engine = create_engine(SQLALCHEMY_DATABASE_URL)
+engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base = declarative_base()
+def init_db():
+    # Crear las tablas en la base de datos
+    Base.metadata.create_all(bind=engine)

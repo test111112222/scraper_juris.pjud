@@ -71,7 +71,7 @@ services:
   postgres_exporter:
     image: wrouesnel/postgres_exporter:latest
     environment:
-      DATA_SOURCE_NAME: "postgresql://user:password@db:5432/red_social?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://user:password@db:5432/jurispjud?sslmode=disable"
     ports:
       - "9187:9187"
     depends_on:

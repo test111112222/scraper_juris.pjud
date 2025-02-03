@@ -1,12 +1,22 @@
-from fastapi import FastAPI
-from .database import engine  # Importamos engine desde database.py
-from . import models
+from fastapi import FastAPI, Depends
+from sqlalchemy.orm import Session
+from . import models, schemas, scraper, database
+from .scraper import scrape_and_save_data
 
-# Crear las tablas en la base de datos
-models.Base.metadata.create_all(bind=engine)
+# Inicia la base de datos
+database.init_db()
 
 app = FastAPI()
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello World"}
+# Dependency to get the DB session
+def get_db():
+    db = database.SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+@app.get("/scrape")
+async def scrape():
+    await scrape_and_save_data()
+    return {"message": "Data scraped and saved successfully"}

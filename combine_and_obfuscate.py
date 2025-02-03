@@ -8,8 +8,8 @@ def combinar_archivos(directorio_raiz, archivo_salida):
                     ruta_completa = os.path.join(root, file)
                     try:
                         with open(ruta_completa, 'r') as archivo:
-                            contenido = archivo.read().replace("\n", "")
-                            archivo_final.write(f"=== Archivo:{ruta_completa} ===\n{contenido}\n")
+                            contenido = archivo.read().replace("\n", "")  # Asegúrate de que no elimines saltos de línea importantes
+                            archivo_final.write(f"=== Archivo:{ruta_completa} ===\n{contenido}\n\n")  # Agrega un salto de línea entre archivos
                     except Exception as e:
                         print(f"Error al procesar {ruta_completa}: {e}")
 
