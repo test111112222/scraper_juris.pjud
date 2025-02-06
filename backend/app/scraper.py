@@ -1,74 +1,50 @@
-import requests
-from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+import time
 from .database import SessionLocal
 from .models import Sentencia
 
 def fetch_data():
-    url = "https://juris.pjud.cl/busqueda?Sentencias_Penales"
-    headers = {"User-Agent": "Mozilla/5.0"}
-    response = requests.get(url, headers=headers)
-    soup = BeautifulSoup(response.text, "html.parser")
+    # Configurar Selenium para usar el servicio remoto en Docker
+    chrome_options = Options()
+    chrome_options.add_argument("--headless")  # Modo sin interfaz gráfica
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
 
+    driver = webdriver.Remote(
+        command_executor="http://selenium:4444/wd/hub",  # URL del servicio Selenium en Docker
+        options=chrome_options
+    )
+
+    url = "https://juris.pjud.cl/busqueda?Sentencias_Penales"
+    driver.get(url)
+
+    # Esperar 10 segundos para que cargue la página completamente
+    time.sleep(10)
+
+    # Extraer datos con Selenium
     sentences_data = []
-    results = soup.find_all("div", class_="card border-info")
+    results = driver.find_elements(By.CLASS_NAME, "card.border-info")
 
     for result in results:
         sentencia = {}
-        
-                # Buscar "ROL"
-        rol = result.find("span", text=lambda text: text and text.startswith("ROL:"))
-        if rol:
-            rol_text = rol.text.split("ROL:")[-1].strip()
-            sentencia["rol"] = rol_text
-        else:
+
+        try:
+            rol = result.find_element(By.XPATH, ".//span[contains(text(), 'ROL:')]")
+            sentencia["rol"] = rol.text.split("ROL:")[-1].strip() if rol else None
+        except:
             sentencia["rol"] = None
-        print(f"ROL: {sentencia['rol']}")  # Log para depuración
 
-        caratulado = result.find("span", string=lambda text: text and text.startswith("Caratulado:"))
-        if caratulado:
-            sentencia["caratulado"] = caratulado.text.split("Caratulado:")[-1].strip()
-        else:
+        try:
+            caratulado = result.find_element(By.XPATH, ".//span[contains(text(), 'Caratulado:')]")
+            sentencia["caratulado"] = caratulado.text.split("Caratulado:")[-1].strip() if caratulado else None
+        except:
             sentencia["caratulado"] = None
-        print(f"Caratulado: {sentencia['caratulado']}")  # Log para depuración
-
-        fecha = result.find("span", string=lambda text: text and text.startswith("Fecha:"))
-        if fecha:
-            sentencia["fecha"] = fecha.text.split("Fecha:")[-1].strip()
-        else:
-            sentencia["fecha"] = None
-        print(f"Fecha: {sentencia['fecha']}")  # Log para depuración
-
-        tribunal = result.find("span", text=lambda text: text and text.startswith("Tribunal:"))
-        if tribunal:
-            tribunal_text = tribunal.text.split("Tribunal:")[-1].strip()
-            sentencia["tribunal"] = tribunal_text
-        else:
-            sentencia["tribunal"] = None
-        print(f"Tribunal: {sentencia['tribunal']}")  # Log para depuración
-
-        materia = result.find("span", string=lambda text: text and text.startswith("Materia:"))
-        if materia:
-            sentencia["materia"] = materia.text.split("Materia:")[-1].strip()
-        else:
-            sentencia["materia"] = None
-        print(f"Materia: {sentencia['materia']}")  # Log para depuración
-
-        juez = result.find("span", string=lambda text: text and text.startswith("Juez(a):"))
-        if juez:
-            sentencia["juez"] = juez.text.split("Juez(a):")[-1].strip()
-        else:
-            sentencia["juez"] = None
-        print(f"Juez(a): {sentencia['juez']}")  # Log para depuración
-
-        enlace = result.find("a", {"id": "url_enlace_sentencia_panel_resultados_0"})
-        if enlace:
-            sentencia["enlace"] = enlace["href"]
-        else:
-            sentencia["enlace"] = None
-        print(f"Enlace: {sentencia['enlace']}")  # Log para depuración
 
         sentences_data.append(sentencia)
 
+    driver.quit()
     return sentences_data
 
 def save_sentences_to_db(sentences_data):

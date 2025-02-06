@@ -1,27 +1,133 @@
-=== Archivo:./combine_and_obfuscate.py ===
-import osdef combinar_archivos(directorio_raiz, archivo_salida):    with open(archivo_salida, 'w') as archivo_final:        for root, _, files in os.walk(directorio_raiz):            for file in files:                if file.endswith('.py'):                    ruta_completa = os.path.join(root, file)                    try:                        with open(ruta_completa, 'r') as archivo:                            contenido = archivo.read().replace("\n", "")  # Asegúrate de que no elimines saltos de línea importantes                            archivo_final.write(f"=== Archivo:{ruta_completa} ===\n{contenido}\n\n")  # Agrega un salto de línea entre archivos                    except Exception as e:                        print(f"Error al procesar {ruta_completa}: {e}")if __name__ == "__main__":    directorio_raiz = '.'    archivo_salida = 'combinado.txt'    combinar_archivos(directorio_raiz, archivo_salida)    print(f"Archivos combinados en {archivo_salida}")
+=== Archivo: ./backend/app/models.py ===
+from sqlalchemy import Column, Integer, String, Date, Text
+from sqlalchemy.ext.declarative import declarative_base
 
-=== Archivo:./backend/app/models.py ===
-from sqlalchemy import Column, Integer, Stringfrom .database import Base class Item(Base):    __tablename__ = 'items'    id = Column(Integer, primary_key=True, index=True)    name = Column(String, index=True)    description = Column(String)
+Base = declarative_base()
 
-=== Archivo:./backend/app/crud.py ===
+class Sentencia(Base):
+    __tablename__ = 'sentencia'
 
-
-=== Archivo:./backend/app/scraper.py ===
-import requestsfrom bs4 import BeautifulSoupfrom typing import List# Definir la URL base de la páginaBASE_URL = "https://juris.pjud.cl/busqueda/u?dmj88"def obtener_sentencia(url: str) -> dict:    """    Función que extrae la información de una sentencia desde una URL.    """    try:        # Hacer la solicitud HTTP        response = requests.get(url)        response.raise_for_status()        # Analizar el contenido con BeautifulSoup        soup = BeautifulSoup(response.content, 'html.parser')        # Extraer los datos de la sentencia        sentencia = {}        sentencia['rol'] = soup.find('h3').text.strip()  # Ejemplo: "ROL: O-44-2024"        sentencia['caratulado'] = soup.find('h4').text.strip()  # Ejemplo: "Caratulado: MP C/ MACARENA LUZ MARÍA ERICES ARENAS"        sentencia['fecha'] = soup.find('span', {'class': 'fecha'}).text.strip()  # Ejemplo: "Fecha: 30-01-2025"        sentencia['tribunal'] = soup.find('div', {'class': 'tribunal'}).text.strip()  # Ejemplo: "Tribunal: Tribunal de Juicio Oral en lo Penal San Antonio"        sentencia['materia'] = soup.find('div', {'class': 'materia'}).text.strip()  # Ejemplo: "Materia: TRAFICO DE PEQUEÑAS CANTIDADES (ART. 4)."        sentencia['juez'] = soup.find('div', {'class': 'juez'}).text.strip()  # Ejemplo: "Juez(a): Héctor Flavio Galleguillos Carmona"        sentencia['enlace'] = url  # El enlace a la sentencia        return sentencia    except Exception as e:        print(f"Error al obtener sentencia: {e}")        return Nonedef scrape_sentencias() -> List[dict]:    """    Función para scrapear las sentencias de la página de jurispjud.    """    sentencias = []    urls = ["https://juris.pjud.cl/busqueda?Sentencias_Penales"]  # Lista de URLs que deseas scrapear, por ejemplo    for url in urls:        sentencia = obtener_sentencia(url)        if sentencia:            sentencias.append(sentencia)    return sentenciasif __name__ == "__main__":    sentencias = scrape_sentencias()    for sentencia in sentencias:        print(sentencia)  # Imprimir los resultados
-
-=== Archivo:./backend/app/schemas.py ===
-from pydantic import BaseModelfrom typing import Listclass Sentencia(BaseModel):    ROL: str    Caratulado: str    Fecha: str    Tribunal: str    Materia: str    Juez_a: str    Enlace_sentencia: str
-
-=== Archivo:./backend/app/database.py ===
-from sqlalchemy import create_enginefrom sqlalchemy.ext.declarative import declarative_basefrom sqlalchemy.orm import sessionmakerSQLALCHEMY_DATABASE_URL = "postgresql://user:password@db/red_social"engine = create_engine(SQLALCHEMY_DATABASE_URL)SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)Base = declarative_base()
-
-=== Archivo:./backend/app/main.py ===
-from fastapi import FastAPIfrom .database import engine  # Importamos engine desde database.pyfrom . import modelsfrom .scraper import scrape_sentenciasfrom typing import List# Crear las tablas en la base de datosmodels.Base.metadata.create_all(bind=engine)app = FastAPI()@app.get("/scrape_sentencias", response_model=List[Sentencia])def get_scraped_sentencias():    """    Endpoint que ejecuta el scraper y devuelve las sentencias extraídas.    """    sentencias = scrape_sentencias()    if sentencias:        return sentencias    else:        return {"message": "No se encontraron sentencias."}
-
-=== Archivo:./backend/app/config.py ===
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    rol = Column(String, nullable=False)
+    caratulado = Column(String, nullable=False)
+    fecha = Column(Date, nullable=False)
+    tribunal = Column(String, nullable=False)
+    materia = Column(String, nullable=False)
+    juez = Column(String, nullable=False)
+    enlace = Column(String, nullable=False)
 
 
-=== Archivo:./backend/app/__init__.py ===
+
+=== Archivo: ./backend/app/schemas.py ===
+from pydantic import BaseModel
+from datetime import datetime
+
+class SentenciaBase(BaseModel):
+    rol: str
+    caratulado: str
+    fecha: datetime
+    tribunal: str
+    materia: str
+    juez_a: str
+    enlace_sentencia: str
+
+class SentenciaCreate(SentenciaBase):
+    pass
+
+class Sentencia(SentenciaBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
+=== Archivo: ./backend/app/crud.py ===
+
+
+=== Archivo: ./backend/app/scraper.py ===
+import requests
+from bs4 import BeautifulSoup
+from .database import SessionLocal
+from .models import Sentencia
+
+def fetch_data():
+    url = "https://juris.pjud.cl/busqueda?Sentencias_Penales"
+    headers = {"User-Agent": "Mozilla/5.0"}
+    response = requests.get(url, headers=headers)
+    soup = BeautifulSoup(response.text, "html.parser")
+
+    sentences_data = []
+    results = soup.find_all("div", class_="card border-info")
+
+    for result in results:
+        sentencia = {}
+        
+                # Buscar "ROL"
+        rol = result.find("span", text=lambda text: text and text.startswith("ROL:"))
+        if rol:
+            rol_text = rol.text.split("ROL:")[-1].strip()
+            sentencia["rol"] = rol_text
+        else:
+            sentencia["rol"] = None
+        print(f"ROL: {sentencia['rol']}")  # Log para depuración
+
+        caratulado = result.find("span", string=lambda text: text and text.startswith("Caratulado:"))
+        if caratulado:
+            sentencia["caratulado"] = caratulado.text.split("Caratulado:")[-1].strip()
+        else:
+            sentencia["caratulado"] = None
+        print(f"Caratulado: {sentencia['caratulado']}")  # Log para depuración
+
+        fecha = result.find("span", string=lambda text: text and text.startswith("Fecha:"))
+        if fecha:
+            sentencia["fecha"] = fecha.text.split("Fecha:")[-1].strip()
+        else:
+            sentencia["fecha"] = None
+        print(f"Fecha: {sentencia['fecha']}")  # Log para depuración
+
+        tribunal = result.find("span", text=lambda text: text and text.startswith("Tribunal:"))
+        if tribunal:
+            tribunal_text = tribunal.text.split("Tribunal:")[-1].strip()
+            sentencia["tribunal"] = tribunal_text
+        else:
+            sentencia["tribunal"] = None
+        print(f"Tribunal: {sentencia['tribunal']}")  # Log para depuración
+
+        materia = result.find("span", string=lambda text: text and text.startswith("Materia:"))
+        if materia:
+            sentencia["materia"] = materia.text.split("Materia:")[-1].strip()
+        else:
+            sentencia["materia"] = None
+        print(f"Materia: {sentencia['materia']}")  # Log para depuración
+
+        juez = result.find("span", string=lambda text: text and text.startswith("Juez(a):"))
+        if juez:
+            sentencia["juez"] = juez.text.split("Juez(a):")[-1].strip()
+        else:
+            sentencia["juez"] = None
+        print(f"Juez(a): {sentencia['juez']}")  # Log para depuración
+
+        enlace = result.find("a", {"id": "url_enlace_sentencia_panel_resultados_0"})
+        if enlace:
+            sentencia["enlace"] = enlace["href"]
+        else:
+            sentencia["enlace"] = None
+        print(f"Enlace: {sentencia['enlace']}")  # Log para depuración
+
+        sentences_data.append(sentencia)
+
+    return sentences_data
+
+def save_sentences_to_db(sentences_data):
+    db = SessionLocal()
+    for data in sentences_data:
+        if data.get("rol") is not None:  # Solo guardamos si el 'rol' no es None
+            db.add(Sentencia(**data))
+    db.commit()
+    db.close()
+
+async def scrape_and_save_data():
+    sentences_data = fetch_data()
+    save_sentences_to_db(sentences_data)
 
 

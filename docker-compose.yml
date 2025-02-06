@@ -23,8 +23,17 @@ services:
       - "8000:8000"
     depends_on:
       - db
+      - selenium
     networks:
       - red_social_network
+
+  selenium:
+    image: selenium/standalone-chrome
+    container_name: selenium_chrome
+    shm_size: '2g'  # Evita problemas de memoria en Chrome
+    networks:
+      - red_social_network
+
 
   grafana:
     image: grafana/grafana:latest

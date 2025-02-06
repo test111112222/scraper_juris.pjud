@@ -9,3 +9,4 @@ passlib
 beautifulsoup4
 requests
 httpx
+selenium
